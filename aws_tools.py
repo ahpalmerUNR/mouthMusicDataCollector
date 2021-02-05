@@ -2,9 +2,11 @@
 # @Author: ahpalmerUNR
 # @Date:   2021-02-03 13:59:13
 # @Last Modified by:   ahpalmerUNR
-# @Last Modified time: 2021-02-03 16:31:35
+# @Last Modified time: 2021-02-05 14:03:24
+from os import listdir
+from os.path import isfile, join
+
 import boto3
-from botocore.exceptions import NoCredentialsError
 
 accessKey = ''
 secretKey = ''
@@ -14,7 +16,12 @@ def awsSession(region_name='us-west-2'):
 								aws_secret_access_key=secretKey,
 								region_name=region_name)
 
-def uploadToAws(localFile, bucketName, s3File):
+def uploadDirectoryToAWS(directory,bucketName):
+	onlyfiles = [f for f in listdir(directory) if isfile(join(directory, f))]
+	for a in onlyfiles:
+		uploadFileToAws(directory + a,bucketName,directory + a)
+
+def uploadFileToAws(localFile, bucketName, s3File):
 	session = awsSession()
 	s3_resource = session.resource('s3')
 
