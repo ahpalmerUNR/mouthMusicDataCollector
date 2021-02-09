@@ -2,7 +2,7 @@
 # @Author: ahpalmerUNR
 # @Date:   2021-02-03 13:49:34
 # @Last Modified by:   ahpalmerUNR
-# @Last Modified time: 2021-02-08 21:46:40
+# @Last Modified time: 2021-02-09 14:07:32
 import aws_tools as awt
 import time 
 import os
@@ -35,6 +35,7 @@ intensity = 100
 currentCount = 0
 stateInd = 40
 timeGoing = False
+collectFrameCount = 5
 
 stateCounts = [-1,360.0/targetSpeed,-1,360.0/targetSpeed,-1,360.0/targetSpeed] + [-1,mouthBoxRate/targetSpeed,-1,mouthBoxRate/targetSpeed,-1,mouthBoxRate/targetSpeed]*5 + [-1,-2,-1,-2,1]
 stateText = ["Cheek Circle",""]*3 + ["Tongue Out",""]*3 + ["Pucker Lips",""]*3 + ["Left Wink",""]*3 + ["Right Wink",""]*3 + ["Left Brow Raise",""]*3 + ["No Trigger","","Talk In","",""]
@@ -128,11 +129,17 @@ def generateNewIntensity():
 	intensity = rm.sample([10,50,100],1)[0]
 		
 def updateImageAndSymbols(parent,imageLabel):
+	global collectFrameCount
 	ret,image = capture.read()
 	imageWithContent,data = drawContent(image)
 	placeOpenCVImageInTK(imageWithContent,imageLabel)
-	if int(time.time())%2 == 0 and state == "Collect" and data != {}:
+	print(state,collectFrameCount,data)
+	if collectFrameCount == 0 and state == "Collect" and data != {}:
+		collectFrameCount = 5
 		saveImage(image,data)
+		print("Saved Frame")
+	if state == "Collect" and data != {}:
+		collectFrameCount = collectFrameCount - 1
 	
 def drawContent(image):
 	global targetTime,currentCount,stateInd,state,timeGoing
