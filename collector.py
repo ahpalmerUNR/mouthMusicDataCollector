@@ -2,7 +2,7 @@
 # @Author: ahpalmerUNR
 # @Date:   2021-02-03 13:49:34
 # @Last Modified by:   ahpalmerUNR
-# @Last Modified time: 2021-02-05 14:40:20
+# @Last Modified time: 2021-02-08 16:11:42
 import aws_tools as awt
 import time 
 import os
@@ -33,12 +33,31 @@ circleLoopNumber = 0
 mouthBoxRate = 200
 targetSpeed = 2
 intensity = 100
+currentCount = 0
+stateInd = 0
+
+stateCounts = [-1,360.0/targetSpeed,-1,360.0/targetSpeed,-1,360.0/targetSpeed] + [-1,mouthBoxRate,-1,mouthBoxRate,-1,mouthBoxRate]*5 + [-1,-2,-1,-2,0]
+stateText = ["Cheek Circle",""]*3 + ["Tongue Out",""]*3 + ["Pucker Lips",""]*3 + ["Left Wink",""]*3 + ["Right Wink",""]*3 + ["Left Brow Raise",""]*3 + ["Stay Still","","Talk In","",""]
 
 def main():
+	try:
+		loadCircleCenterLoc()
+	except Exception as e:
+		print("Reverting to Default Circle Location.")
 	root = tk.Tk()
 	root.geometry("900x600")
 	app = Application(master=root)
 	app.mainloop()
+	
+def loadCircleCenterLoc():
+	global circleCenter
+	with open("savedLoc.txt","r") as file:
+		line = file.readline().replace("\n","").split(",")
+		circleCenter = (int(line[0]),int(line[1]))
+		
+def saveCircleCenterLoc():
+	with open("savedLoc.txt","w") as file:
+		file.write("%d,%d\n"%(circleCenter[0],circleCenter[1]))
 	
 class Application(tk.Frame):
 	"""Application Window"""
@@ -55,7 +74,7 @@ class Application(tk.Frame):
 		def updateImage(parent,label):
 			updateImageAndSymbols(parent,label)
 			parent.master.update_idletasks()
-			parent.master.after(15,lambda:updateImage(parent,label))
+			parent.master.after(5,lambda:updateImage(parent,label))
 			
 		updateImage(self,imageTKLabel)
 		self.packButton("Practice",runPracticeCycle,side="left",fill="x")
@@ -93,8 +112,8 @@ def generateNewCirclePos():
 	if state == "None":
 		newX = int(rm.random()*((-1)**(math.floor(rm.random()+.5)))*100 + videoWidth/2)
 		newY = int(rm.random()*((-1)**(math.floor(rm.random()+.5)))*50 + videoHeigh/2) 
-		print(newX,newY,-1**(math.floor(rm.random()+.5)))
 		circleCenter = (newX,newY)
+		saveCircleCenterLoc()
 		
 def generateNewIntensity():
 	global intensity
@@ -104,21 +123,39 @@ def updateImageAndSymbols(parent,imageLabel):
 	ret,image = capture.read()
 	imageWithContent,data = drawContent(image)
 	placeOpenCVImageInTK(imageWithContent,imageLabel)
-	if int(time.time())%2 == 0 and state == "Collect":
+	if int(time.time())%2 == 0 and state == "Collect" and data != {}:
 		saveImage(image,data)
 	
 def drawContent(image):
-	global circleLoopNumber,targetTime
+	global circleLoopNumber,targetTime,currentCount,stateInd,state
+	
 	imageWithContent = image.copy()
-	cycleState = "Cheek"
-	if circleLoopNumber%1000 == 0:
-		targetTime = time.time() + 4
-	circleLoopNumber = circleLoopNumber + 2
-	drawMouthCircles(imageWithContent,mainRadius)
-	targetLocation = drawTargetCircles(imageWithContent,mainRadius,circleLoopNumber)
-	drawTargetBox(imageWithContent,circleLoopNumber)
-	drawCountDown(imageWithContent,targetTime)
-	data = makeDataDict(targetLocation,cycleState)
+	targetLocation = (0,0)
+	if targetTime < time.time():
+		targetTime = getTargetTime(stateInd)
+	if state != "None":
+		currentCount,stateInd = controlStateGetCount(stateInd,currentCount)
+	if stateInd <= 1:
+		radius = mainRadius 
+	if stateInd <= 3 and stateInd > 1:
+		radius = mainRadius - 30
+	if stateInd <= 5 and stateInd > 3:
+		radius = mainRadius - 60
+	if stateInd <= 5:
+		drawMouthCircles(imageWithContent,radius)
+		if stateInd%2==1:
+			targetLocation = drawTargetCircles(imageWithContent,radius,circleLoopNumber)
+	if stateInd%2 == 1 and stateInd >5 and stateInd <=35:
+		drawTargetBox(imageWithContent,circleLoopNumber)
+	if stateInd%2 == 0:
+		drawCountDown(imageWithContent,targetTime,stateText[stateInd])
+		data = {}
+	else:
+		data = makeDataDict(targetLocation,getStateName(stateInd))
+	if stateInd == 47 and currentCount == stateCounts[stateInd]:
+		state = "None"
+		stateInd = 0
+		currentCount = 0
 	return imageWithContent,data
 	
 def placeOpenCVImageInTK(image,label_image):
@@ -126,7 +163,40 @@ def placeOpenCVImageInTK(image,label_image):
 	tkimg[0] = ImageTk.PhotoImage(Image.fromarray(image))
 	label_image.config(image=tkimg[0])
 
-	
+def controlStateGetCount(stateInd,currentCount):
+	if stateCounts[stateInd] < 0:
+		return currentCount, stateInd
+	elif currentCount >= stateCounts[stateInd]:
+		return 0,stateInd+1
+	else:
+		return currentCount + 1,stateInd
+		
+def getTargetTime(stateInd):
+	if stateCounts[stateInd] == -1:
+		return time.time() + 4
+	elif stateCounts[stateInd] == -2:
+		return time.time() + 2
+	else:
+		return time.time() -1
+		
+def getStateName(stateInd):
+	if stateInd <= 5:
+		return "In Cheek"
+	elif stateInd > 5 and stateInd <= 11:
+		return "Tongue Out"
+	elif stateInd > 11 and stateInd <= 17:
+		return "Pucker Lips"
+	elif stateInd > 17 and stateInd <= 23:
+		return "Left Wink"
+	elif stateInd > 23 and stateInd <= 29:
+		return "Right Wink"
+	elif stateInd > 29 and stateInd <= 35:
+		return "Left Brow"
+	elif stateInd > 35 and stateInd <= 41:
+		return "No Trigger"
+	elif stateInd > 41 and stateInd <= 47:
+		return "Talking"
+		
 def drawMouthCircles(image,radius):
 	cv.circle(image,circleCenter,radius,(255,255,255),2)
 	cv.circle(image,circleCenter,2,(255,255,255),2)
@@ -143,14 +213,14 @@ def drawTargetBox(image,boxLoopNumber):
 	color = (abs(int((boxLoopNumber/mouthBoxRate)*510)%510 - 255),0,255 - abs(int((boxLoopNumber/mouthBoxRate)*510)%510 - 255))
 	cv.rectangle(image,(circleCenter[0]-xDiff,circleCenter[1] - yDiff),(circleCenter[0]+xDiff,circleCenter[1] +yDiff),color,3)
 	
-def drawCountDown(image,targetTime):
+def drawCountDown(image,targetTime,modeText):
 	number = max(int(targetTime - time.time()),0)
 	font = cv.FONT_HERSHEY_SIMPLEX
-	bottomLeftCornerOfText = (10,50)
-	fontScale = 1
+	bottomLeftCornerOfText = (circleCenter[0]-40,circleCenter[1]+40)
+	fontScale = 4
 	fontColor = (0,0,255)
-	lineType = 2
-
+	lineType = 9
+	cv.putText(image,modeText,(50,100),font, 2,(200,0,150),lineType)
 	cv.putText(image,"%d"%number, bottomLeftCornerOfText, font, fontScale,fontColor,lineType)
 	
 def makeDataDict(target,cycleState):
