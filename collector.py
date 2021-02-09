@@ -2,7 +2,7 @@
 # @Author: ahpalmerUNR
 # @Date:   2021-02-03 13:49:34
 # @Last Modified by:   ahpalmerUNR
-# @Last Modified time: 2021-02-08 16:11:42
+# @Last Modified time: 2021-02-08 21:46:40
 import aws_tools as awt
 import time 
 import os
@@ -29,15 +29,15 @@ circleCenter = (int(videoWidth/2),int(videoHeigh/2))
 mainRadius = 90
 targetTime = time.time()
 
-circleLoopNumber = 0
 mouthBoxRate = 200
-targetSpeed = 2
+targetSpeed = 4
 intensity = 100
 currentCount = 0
-stateInd = 0
+stateInd = 40
+timeGoing = False
 
-stateCounts = [-1,360.0/targetSpeed,-1,360.0/targetSpeed,-1,360.0/targetSpeed] + [-1,mouthBoxRate,-1,mouthBoxRate,-1,mouthBoxRate]*5 + [-1,-2,-1,-2,0]
-stateText = ["Cheek Circle",""]*3 + ["Tongue Out",""]*3 + ["Pucker Lips",""]*3 + ["Left Wink",""]*3 + ["Right Wink",""]*3 + ["Left Brow Raise",""]*3 + ["Stay Still","","Talk In","",""]
+stateCounts = [-1,360.0/targetSpeed,-1,360.0/targetSpeed,-1,360.0/targetSpeed] + [-1,mouthBoxRate/targetSpeed,-1,mouthBoxRate/targetSpeed,-1,mouthBoxRate/targetSpeed]*5 + [-1,-2,-1,-2,1]
+stateText = ["Cheek Circle",""]*3 + ["Tongue Out",""]*3 + ["Pucker Lips",""]*3 + ["Left Wink",""]*3 + ["Right Wink",""]*3 + ["Left Brow Raise",""]*3 + ["No Trigger","","Talk In","",""]
 
 def main():
 	try:
@@ -45,7 +45,11 @@ def main():
 	except Exception as e:
 		print("Reverting to Default Circle Location.")
 	root = tk.Tk()
-	root.geometry("900x600")
+	windowX = root.winfo_screenwidth()-900
+	windowY = root.winfo_screenheight()-600
+	windowXOffset = int(rm.random()*windowX/2)*2
+	windowYOffset = int(rm.random()*windowY/2)*2
+	root.geometry("900x600+%d+%d"%(windowXOffset,windowYOffset))
 	app = Application(master=root)
 	app.mainloop()
 	
@@ -95,15 +99,19 @@ class Application(tk.Frame):
 		newButton.pack({"side":side,"fill":fill,"expand":expand})
 
 def runPracticeCycle():
-	global state
+	global state, currentCount,stateInd
 	if state == "None":
 		state = "Practice"
+		currentCount = 0
+		stateInd = 0
 	generateNewIntensity()
 	
 def runCollectionCycle():
-	global state
+	global state,currentCount,stateInd
 	if state == "None":
 		state = "Collect"
+		currentCount = 0
+		stateInd = 0
 	generateNewIntensity()
 	updateDirectoryName()
 	
@@ -127,34 +135,40 @@ def updateImageAndSymbols(parent,imageLabel):
 		saveImage(image,data)
 	
 def drawContent(image):
-	global circleLoopNumber,targetTime,currentCount,stateInd,state
+	global targetTime,currentCount,stateInd,state,timeGoing
 	
 	imageWithContent = image.copy()
 	targetLocation = (0,0)
-	if targetTime < time.time():
+	if targetTime < time.time() and stateInd%2==0 and timeGoing == False and stateInd != 40:
 		targetTime = getTargetTime(stateInd)
+		timeGoing = True
+	if targetTime < time.time() and timeGoing == True:
+		stateInd = stateInd + 1
+		timeGoing = False
+		if stateInd == 37 or stateInd == 39:
+			targetTime = getTargetTime(stateInd)
+			timeGoing = True
 	if state != "None":
 		currentCount,stateInd = controlStateGetCount(stateInd,currentCount)
-	if stateInd <= 1:
+	if stateInd <= 1 or stateInd == 40:
 		radius = mainRadius 
 	if stateInd <= 3 and stateInd > 1:
 		radius = mainRadius - 30
 	if stateInd <= 5 and stateInd > 3:
 		radius = mainRadius - 60
-	if stateInd <= 5:
+	if stateInd <= 5 or stateInd == 40:
 		drawMouthCircles(imageWithContent,radius)
 		if stateInd%2==1:
-			targetLocation = drawTargetCircles(imageWithContent,radius,circleLoopNumber)
+			targetLocation = drawTargetCircles(imageWithContent,radius,currentCount)
 	if stateInd%2 == 1 and stateInd >5 and stateInd <=35:
-		drawTargetBox(imageWithContent,circleLoopNumber)
-	if stateInd%2 == 0:
+		drawTargetBox(imageWithContent,currentCount)
+	if stateInd%2 == 0 and stateInd != 40:
 		drawCountDown(imageWithContent,targetTime,stateText[stateInd])
 		data = {}
 	else:
 		data = makeDataDict(targetLocation,getStateName(stateInd))
-	if stateInd == 47 and currentCount == stateCounts[stateInd]:
+	if stateInd == 40:
 		state = "None"
-		stateInd = 0
 		currentCount = 0
 	return imageWithContent,data
 	
@@ -192,9 +206,9 @@ def getStateName(stateInd):
 		return "Right Wink"
 	elif stateInd > 29 and stateInd <= 35:
 		return "Left Brow"
-	elif stateInd > 35 and stateInd <= 41:
+	elif stateInd > 35 and stateInd <= 37:
 		return "No Trigger"
-	elif stateInd > 41 and stateInd <= 47:
+	elif stateInd > 37 and stateInd <= 39:
 		return "Talking"
 		
 def drawMouthCircles(image,radius):
@@ -202,15 +216,15 @@ def drawMouthCircles(image,radius):
 	cv.circle(image,circleCenter,2,(255,255,255),2)
 
 def drawTargetCircles(image,radius,circleLoopNumber):
-	xPos = int(math.cos(targetSpeed*math.pi*circleLoopNumber/360.0)*radius) + circleCenter[0]
-	yPos = int(math.sin(targetSpeed*math.pi*circleLoopNumber/360.0)*radius) + circleCenter[1]
+	xPos = int(math.cos(targetSpeed*math.pi*(circleLoopNumber)/180.0 - math.pi/4)*radius) + circleCenter[0]
+	yPos = int(math.sin(targetSpeed*math.pi*(circleLoopNumber)/180.0 - math.pi/4)*radius) + circleCenter[1]
 	cv.circle(image,(xPos,yPos),10,(255,100,30),2)
 	return (xPos,yPos)
 	
 def drawTargetBox(image,boxLoopNumber):
-	xDiff = 50 - abs(int((boxLoopNumber/mouthBoxRate)*100)%100 - 50)
-	yDiff = 25 - abs(int((boxLoopNumber/mouthBoxRate)*50)%50 - 25)
-	color = (abs(int((boxLoopNumber/mouthBoxRate)*510)%510 - 255),0,255 - abs(int((boxLoopNumber/mouthBoxRate)*510)%510 - 255))
+	xDiff = 50 - abs(int((boxLoopNumber*targetSpeed/mouthBoxRate)*100)%100 - 50)
+	yDiff = 25 - abs(int((boxLoopNumber*targetSpeed/mouthBoxRate)*50)%50 - 25)
+	color = (abs(int((boxLoopNumber*targetSpeed/mouthBoxRate)*510)%510 - 255),0,255 - abs(int((boxLoopNumber*targetSpeed/mouthBoxRate)*510)%510 - 255))
 	cv.rectangle(image,(circleCenter[0]-xDiff,circleCenter[1] - yDiff),(circleCenter[0]+xDiff,circleCenter[1] +yDiff),color,3)
 	
 def drawCountDown(image,targetTime,modeText):
@@ -220,7 +234,7 @@ def drawCountDown(image,targetTime,modeText):
 	fontScale = 4
 	fontColor = (0,0,255)
 	lineType = 9
-	cv.putText(image,modeText,(50,100),font, 2,(200,0,150),lineType)
+	cv.putText(image,modeText,(50,100),font, 2,(0,0,255),lineType)
 	cv.putText(image,"%d"%number, bottomLeftCornerOfText, font, fontScale,fontColor,lineType)
 	
 def makeDataDict(target,cycleState):
