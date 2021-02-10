@@ -2,7 +2,7 @@
 # @Author: ahpalmerUNR
 # @Date:   2021-02-03 13:49:34
 # @Last Modified by:   ahpalmerUNR
-# @Last Modified time: 2021-02-09 14:07:32
+# @Last Modified time: 2021-02-10 14:47:01
 import aws_tools as awt
 import time 
 import os
@@ -15,6 +15,7 @@ import tkinter as tk
 from PIL import Image, ImageTk
 
 awt.loadKeys("keys.csv")
+awt.loadBucket("bucket.txt")
 
 videoWidth, videoHeigh = (640,480)
 capture = cv.VideoCapture(0)
@@ -35,7 +36,8 @@ intensity = 100
 currentCount = 0
 stateInd = 40
 timeGoing = False
-collectFrameCount = 5
+collectFrameCount = 3
+color = (255,255,255)
 
 stateCounts = [-1,360.0/targetSpeed,-1,360.0/targetSpeed,-1,360.0/targetSpeed] + [-1,mouthBoxRate/targetSpeed,-1,mouthBoxRate/targetSpeed,-1,mouthBoxRate/targetSpeed]*5 + [-1,-2,-1,-2,1]
 stateText = ["Cheek Circle",""]*3 + ["Tongue Out",""]*3 + ["Pucker Lips",""]*3 + ["Left Wink",""]*3 + ["Right Wink",""]*3 + ["Left Brow Raise",""]*3 + ["No Trigger","","Talk In","",""]
@@ -55,14 +57,15 @@ def main():
 	app.mainloop()
 	
 def loadCircleCenterLoc():
-	global circleCenter
+	global circleCenter,intensity
 	with open("savedLoc.txt","r") as file:
 		line = file.readline().replace("\n","").split(",")
 		circleCenter = (int(line[0]),int(line[1]))
+		intensity = int(line[2])
 		
 def saveCircleCenterLoc():
 	with open("savedLoc.txt","w") as file:
-		file.write("%d,%d\n"%(circleCenter[0],circleCenter[1]))
+		file.write("%d,%d,%d\n"%(circleCenter[0],circleCenter[1],intensity))
 	
 class Application(tk.Frame):
 	"""Application Window"""
@@ -86,13 +89,13 @@ class Application(tk.Frame):
 		self.packButton("Collect",runCollectionCycle,side="left",fill="x")
 		self.packButton("New Position",generateNewCirclePos,side="right",fill="x")
 		
-	def packButton(self,text,command,color="black",side="top",fill="none",parentFrame=None):
+	def packButton(self,text,command,buttonColor="black",side="top",fill="none",parentFrame=None):
 		if parentFrame != None:
 			newButton = tk.Button(parentFrame)
 		else:
 			newButton = tk.Button(self)
 		newButton["text"] = text
-		newButton["fg"] = color
+		newButton["fg"] = buttonColor
 		newButton["command"] = command
 		if fill == "none":
 			newButton["width"] = 15
@@ -105,7 +108,8 @@ def runPracticeCycle():
 		state = "Practice"
 		currentCount = 0
 		stateInd = 0
-	generateNewIntensity()
+		generateNewIntensity()
+	saveCircleCenterLoc()
 	
 def runCollectionCycle():
 	global state,currentCount,stateInd
@@ -113,8 +117,9 @@ def runCollectionCycle():
 		state = "Collect"
 		currentCount = 0
 		stateInd = 0
-	generateNewIntensity()
-	updateDirectoryName()
+		generateNewIntensity()
+		updateDirectoryName()
+	saveCircleCenterLoc()
 	
 def generateNewCirclePos():
 	global state, circleCenter
@@ -126,7 +131,9 @@ def generateNewCirclePos():
 		
 def generateNewIntensity():
 	global intensity
-	intensity = rm.sample([10,50,100],1)[0]
+	lastIntensity = intensity
+	while lastIntensity == intensity:
+		intensity = rm.sample([10,50,100],1)[0]
 		
 def updateImageAndSymbols(parent,imageLabel):
 	global collectFrameCount
@@ -135,7 +142,7 @@ def updateImageAndSymbols(parent,imageLabel):
 	placeOpenCVImageInTK(imageWithContent,imageLabel)
 	print(state,collectFrameCount,data)
 	if collectFrameCount == 0 and state == "Collect" and data != {}:
-		collectFrameCount = 5
+		collectFrameCount = 3
 		saveImage(image,data)
 		print("Saved Frame")
 	if state == "Collect" and data != {}:
@@ -160,9 +167,9 @@ def drawContent(image):
 	if stateInd <= 1 or stateInd == 40:
 		radius = mainRadius 
 	if stateInd <= 3 and stateInd > 1:
-		radius = mainRadius - 30
+		radius = mainRadius - 20
 	if stateInd <= 5 and stateInd > 3:
-		radius = mainRadius - 60
+		radius = mainRadius - 40
 	if stateInd <= 5 or stateInd == 40:
 		drawMouthCircles(imageWithContent,radius)
 		if stateInd%2==1:
@@ -173,10 +180,14 @@ def drawContent(image):
 		drawCountDown(imageWithContent,targetTime,stateText[stateInd])
 		data = {}
 	else:
-		data = makeDataDict(targetLocation,getStateName(stateInd))
+		data = makeDataDict(targetLocation,getStateName(stateInd),currentCount,stateCounts[stateInd])
 	if stateInd == 40:
+		if state == "Collect":
+			awt.uploadDirectoryWithWindow(directory)
 		state = "None"
 		currentCount = 0
+		
+	drawIntensity(imageWithContent)
 	return imageWithContent,data
 	
 def placeOpenCVImageInTK(image,label_image):
@@ -194,7 +205,7 @@ def controlStateGetCount(stateInd,currentCount):
 		
 def getTargetTime(stateInd):
 	if stateCounts[stateInd] == -1:
-		return time.time() + 4
+		return time.time() + 3
 	elif stateCounts[stateInd] == -2:
 		return time.time() + 2
 	else:
@@ -231,26 +242,37 @@ def drawTargetCircles(image,radius,circleLoopNumber):
 def drawTargetBox(image,boxLoopNumber):
 	xDiff = 50 - abs(int((boxLoopNumber*targetSpeed/mouthBoxRate)*100)%100 - 50)
 	yDiff = 25 - abs(int((boxLoopNumber*targetSpeed/mouthBoxRate)*50)%50 - 25)
-	color = (abs(int((boxLoopNumber*targetSpeed/mouthBoxRate)*510)%510 - 255),0,255 - abs(int((boxLoopNumber*targetSpeed/mouthBoxRate)*510)%510 - 255))
-	cv.rectangle(image,(circleCenter[0]-xDiff,circleCenter[1] - yDiff),(circleCenter[0]+xDiff,circleCenter[1] +yDiff),color,3)
+	boxColor = (abs(int((boxLoopNumber*targetSpeed/mouthBoxRate)*510)%510 - 255),0,255 - abs(int((boxLoopNumber*targetSpeed/mouthBoxRate)*510)%510 - 255))
+	cv.rectangle(image,(circleCenter[0]-xDiff,circleCenter[1] - yDiff),(circleCenter[0]+xDiff,circleCenter[1] +yDiff),boxColor,3)
 	
 def drawCountDown(image,targetTime,modeText):
 	number = max(int(targetTime - time.time()),0)
 	font = cv.FONT_HERSHEY_SIMPLEX
 	bottomLeftCornerOfText = (circleCenter[0]-40,circleCenter[1]+40)
 	fontScale = 4
-	fontColor = (0,0,255)
 	lineType = 9
-	cv.putText(image,modeText,(50,100),font, 2,(0,0,255),lineType)
-	cv.putText(image,"%d"%number, bottomLeftCornerOfText, font, fontScale,fontColor,lineType)
+	cv.putText(image,modeText,(50,100),font, 2,color,7)
+	cv.putText(image,"%d"%(number+1), bottomLeftCornerOfText, font, fontScale,color,lineType)
 	
-def makeDataDict(target,cycleState):
+def drawIntensity(image):
+	global color
+	color = (0,0,255)
+	if intensity == 10:
+		color = (30,255,0)
+	if intensity == 50:
+		color = (0,190,190)
+	cv.putText(image,"Intensity", (20,410), cv.FONT_HERSHEY_SIMPLEX, 1,color,3)
+	cv.putText(image,"%d"%intensity, (20,450), cv.FONT_HERSHEY_SIMPLEX, 1,color,3)
+	
+def makeDataDict(target,cycleState,stepNumber,totalSteps):
 	data = {}
 	data["name"] = "%r"%time.time()+".png"
 	data["targetX"] = "%d"%target[0]
 	data["targetY"] = "%d"%target[1]
 	data["targetIntensity"] = "%d"%intensity
 	data["state"] = cycleState
+	data["stepNumber"] = "%d"%stepNumber
+	data["totalSteps"] = "%d"%totalSteps
 	return data
 	
 def updateDirectoryName():
@@ -268,6 +290,8 @@ def writeData(file,data):
 	output = output + data["targetX"]+","
 	output = output + data["targetY"]+","
 	output = output + data["targetIntensity"]+","
+	output = output + data["stepNumber"]+","
+	output = output + data["totalSteps"]+","
 	output = output + data["state"]+"\n"
 	file.write("%s"%(output))
 	
