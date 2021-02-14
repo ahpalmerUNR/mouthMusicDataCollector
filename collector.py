@@ -2,12 +2,11 @@
 # @Author: ahpalmerUNR
 # @Date:   2021-02-03 13:49:34
 # @Last Modified by:   ahpalmerUNR
-# @Last Modified time: 2021-02-10 14:47:01
+# @Last Modified time: 2021-02-14 13:59:29
 import aws_tools as awt
 import time 
 import os
-import cv2 as cv 
-import numpy as np 
+import cv2 as cv  
 import random as rm
 import math
 
@@ -140,47 +139,38 @@ def updateImageAndSymbols(parent,imageLabel):
 	ret,image = capture.read()
 	imageWithContent,data = drawContent(image)
 	placeOpenCVImageInTK(imageWithContent,imageLabel)
-	print(state,collectFrameCount,data)
 	if collectFrameCount == 0 and state == "Collect" and data != {}:
 		collectFrameCount = 3
 		saveImage(image,data)
-		print("Saved Frame")
 	if state == "Collect" and data != {}:
 		collectFrameCount = collectFrameCount - 1
 	
 def drawContent(image):
-	global targetTime,currentCount,stateInd,state,timeGoing
-	
+	global targetTime,currentCount,stateInd,state
 	imageWithContent = image.copy()
 	targetLocation = (0,0)
-	if targetTime < time.time() and stateInd%2==0 and timeGoing == False and stateInd != 40:
-		targetTime = getTargetTime(stateInd)
-		timeGoing = True
-	if targetTime < time.time() and timeGoing == True:
-		stateInd = stateInd + 1
-		timeGoing = False
-		if stateInd == 37 or stateInd == 39:
-			targetTime = getTargetTime(stateInd)
-			timeGoing = True
+	
+	updateStateAndTimeInfo()
+	
 	if state != "None":
 		currentCount,stateInd = controlStateGetCount(stateInd,currentCount)
-	if stateInd <= 1 or stateInd == 40:
-		radius = mainRadius 
-	if stateInd <= 3 and stateInd > 1:
-		radius = mainRadius - 20
-	if stateInd <= 5 and stateInd > 3:
-		radius = mainRadius - 40
+	
+	radius = getRadius(stateInd)
+	
 	if stateInd <= 5 or stateInd == 40:
 		drawMouthCircles(imageWithContent,radius)
 		if stateInd%2==1:
 			targetLocation = drawTargetCircles(imageWithContent,radius,currentCount)
+	
 	if stateInd%2 == 1 and stateInd >5 and stateInd <=35:
 		drawTargetBox(imageWithContent,currentCount)
+	
 	if stateInd%2 == 0 and stateInd != 40:
 		drawCountDown(imageWithContent,targetTime,stateText[stateInd])
 		data = {}
 	else:
 		data = makeDataDict(targetLocation,getStateName(stateInd),currentCount,stateCounts[stateInd])
+	
 	if stateInd == 40:
 		if state == "Collect":
 			awt.uploadDirectoryWithWindow(directory)
@@ -194,6 +184,18 @@ def placeOpenCVImageInTK(image,label_image):
 	image = cv.cvtColor(image, cv.COLOR_BGR2RGB)
 	tkimg[0] = ImageTk.PhotoImage(Image.fromarray(image))
 	label_image.config(image=tkimg[0])
+	
+def updateStateAndTimeInfo():
+	global targetTime,timeGoing,stateInd
+	if targetTime < time.time():
+		if timeGoing == True:
+			stateInd = stateInd + 1
+			timeGoing = False
+			if stateInd == 37 or stateInd == 39:
+				targetTime, timeGoing = getTargetTime(stateInd)
+				
+		elif stateInd%2==0 and stateInd != 40:
+			targetTime, timeGoing = getTargetTime(stateInd)
 
 def controlStateGetCount(stateInd,currentCount):
 	if stateCounts[stateInd] < 0:
@@ -205,11 +207,11 @@ def controlStateGetCount(stateInd,currentCount):
 		
 def getTargetTime(stateInd):
 	if stateCounts[stateInd] == -1:
-		return time.time() + 3
+		return time.time() + 3, True
 	elif stateCounts[stateInd] == -2:
-		return time.time() + 2
+		return time.time() + 2, True
 	else:
-		return time.time() -1
+		return time.time() -1, False
 		
 def getStateName(stateInd):
 	if stateInd <= 5:
@@ -228,6 +230,14 @@ def getStateName(stateInd):
 		return "No Trigger"
 	elif stateInd > 37 and stateInd <= 39:
 		return "Talking"
+		
+def getRadius(stateInd):
+	if stateInd <= 1 or stateInd == 40:
+		return mainRadius 
+	if stateInd <= 3 and stateInd > 1:
+		return mainRadius - 20
+	if stateInd <= 5 and stateInd > 3:
+		return mainRadius - 40		
 		
 def drawMouthCircles(image,radius):
 	cv.circle(image,circleCenter,radius,(255,255,255),2)
@@ -295,8 +305,6 @@ def writeData(file,data):
 	output = output + data["state"]+"\n"
 	file.write("%s"%(output))
 	
-
-
 if __name__ == '__main__':
 	main()
 
