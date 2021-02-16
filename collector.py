@@ -2,7 +2,7 @@
 # @Author: ahpalmerUNR
 # @Date:   2021-02-03 13:49:34
 # @Last Modified by:   ahpalmerUNR
-# @Last Modified time: 2021-02-15 19:09:46
+# @Last Modified time: 2021-02-15 19:12:55
 import aws_tools as awt
 import time 
 import os
@@ -30,12 +30,12 @@ mainRadius = 90
 targetTime = time.time()
 
 mouthBoxRate = 200
-targetSpeed = 4
+targetSpeed = 2
 intensity = 100
 currentCount = 0
 stateInd = 40
 timeGoing = False
-collectFrameCount = 3
+collectFrameCount = 12
 color = (255,255,255)
 
 stateCounts = [-1,360.0/targetSpeed,-1,360.0/targetSpeed,-1,360.0/targetSpeed] + [-1,mouthBoxRate/targetSpeed,-1,mouthBoxRate/targetSpeed,-1,mouthBoxRate/targetSpeed]*5 + [-1,-2,-1,-2,1]
