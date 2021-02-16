@@ -2,7 +2,7 @@
 # @Author: ahpalmerUNR
 # @Date:   2021-02-03 13:49:34
 # @Last Modified by:   ahpalmerUNR
-# @Last Modified time: 2021-02-14 13:59:29
+# @Last Modified time: 2021-02-15 19:09:46
 import aws_tools as awt
 import time 
 import os
@@ -164,7 +164,7 @@ def drawContent(image):
 	
 	if stateInd%2 == 1 and stateInd >5 and stateInd <=35:
 		drawTargetBox(imageWithContent,currentCount)
-	
+	imageWithContent = cv.flip(imageWithContent,1)
 	if stateInd%2 == 0 and stateInd != 40:
 		drawCountDown(imageWithContent,targetTime,stateText[stateInd])
 		data = {}
