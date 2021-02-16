@@ -2,7 +2,7 @@
 # @Author: ahpalmerUNR
 # @Date:   2021-02-03 13:49:34
 # @Last Modified by:   ahpalmerUNR
-# @Last Modified time: 2021-02-15 19:12:55
+# @Last Modified time: 2021-02-15 19:31:51
 import aws_tools as awt
 import time 
 import os
@@ -35,6 +35,7 @@ intensity = 100
 currentCount = 0
 stateInd = 40
 timeGoing = False
+collectFrameMax = 12
 collectFrameCount = 12
 color = (255,255,255)
 
@@ -140,7 +141,7 @@ def updateImageAndSymbols(parent,imageLabel):
 	imageWithContent,data = drawContent(image)
 	placeOpenCVImageInTK(imageWithContent,imageLabel)
 	if collectFrameCount == 0 and state == "Collect" and data != {}:
-		collectFrameCount = 3
+		collectFrameCount = collectFrameMax
 		saveImage(image,data)
 	if state == "Collect" and data != {}:
 		collectFrameCount = collectFrameCount - 1
