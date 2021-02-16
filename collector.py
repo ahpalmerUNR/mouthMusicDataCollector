@@ -2,7 +2,7 @@
 # @Author: ahpalmerUNR
 # @Date:   2021-02-03 13:49:34
 # @Last Modified by:   ahpalmerUNR
-# @Last Modified time: 2021-02-15 19:31:51
+# @Last Modified time: 2021-02-16 09:32:26
 import aws_tools as awt
 import time 
 import os
@@ -33,14 +33,15 @@ mouthBoxRate = 200
 targetSpeed = 2
 intensity = 100
 currentCount = 0
-stateInd = 40
+defaultState = 28
+stateInd = 28
 timeGoing = False
 collectFrameMax = 12
 collectFrameCount = 12
 color = (255,255,255)
 
-stateCounts = [-1,360.0/targetSpeed,-1,360.0/targetSpeed,-1,360.0/targetSpeed] + [-1,mouthBoxRate/targetSpeed,-1,mouthBoxRate/targetSpeed,-1,mouthBoxRate/targetSpeed]*5 + [-1,-2,-1,-2,1]
-stateText = ["Cheek Circle",""]*3 + ["Tongue Out",""]*3 + ["Pucker Lips",""]*3 + ["Left Wink",""]*3 + ["Right Wink",""]*3 + ["Left Brow Raise",""]*3 + ["No Trigger","","Talk In","",""]
+stateCounts = [-1,360.0/targetSpeed,-1,360.0/targetSpeed,-1,360.0/targetSpeed] + [-1,mouthBoxRate/targetSpeed]*9 + [-1,-2,-1,-2,1]
+stateText = ["Cheek Circle",""]*3 + ["Tongue Out",""]*1 + ["Pucker Lips",""]*2 + ["Left Wink",""]*2 + ["Right Wink",""]*2 + ["Left Brow Raise",""]*2 + ["No Trigger","","Talk In","",""]
 
 def main():
 	try:
@@ -158,21 +159,21 @@ def drawContent(image):
 	
 	radius = getRadius(stateInd)
 	
-	if stateInd <= 5 or stateInd == 40:
+	if stateInd <= 5 or stateInd == defaultState:
 		drawMouthCircles(imageWithContent,radius)
 		if stateInd%2==1:
 			targetLocation = drawTargetCircles(imageWithContent,radius,currentCount)
 	
-	if stateInd%2 == 1 and stateInd >5 and stateInd <=35:
+	if stateInd%2 == 1 and stateInd >5 and stateInd <=23:
 		drawTargetBox(imageWithContent,currentCount)
 	imageWithContent = cv.flip(imageWithContent,1)
-	if stateInd%2 == 0 and stateInd != 40:
+	if stateInd%2 == 0 and stateInd != defaultState:
 		drawCountDown(imageWithContent,targetTime,stateText[stateInd])
 		data = {}
 	else:
 		data = makeDataDict(targetLocation,getStateName(stateInd),currentCount,stateCounts[stateInd])
 	
-	if stateInd == 40:
+	if stateInd == defaultState:
 		if state == "Collect":
 			awt.uploadDirectoryWithWindow(directory)
 		state = "None"
@@ -192,10 +193,10 @@ def updateStateAndTimeInfo():
 		if timeGoing == True:
 			stateInd = stateInd + 1
 			timeGoing = False
-			if stateInd == 37 or stateInd == 39:
+			if stateInd == 25 or stateInd == 27:
 				targetTime, timeGoing = getTargetTime(stateInd)
 				
-		elif stateInd%2==0 and stateInd != 40:
+		elif stateInd%2==0 and stateInd != defaultState:
 			targetTime, timeGoing = getTargetTime(stateInd)
 
 def controlStateGetCount(stateInd,currentCount):
@@ -217,23 +218,23 @@ def getTargetTime(stateInd):
 def getStateName(stateInd):
 	if stateInd <= 5:
 		return "In Cheek"
-	elif stateInd > 5 and stateInd <= 11:
+	elif stateInd > 5 and stateInd <= 7:
 		return "Tongue Out"
-	elif stateInd > 11 and stateInd <= 17:
+	elif stateInd > 7 and stateInd <= 11:
 		return "Pucker Lips"
-	elif stateInd > 17 and stateInd <= 23:
+	elif stateInd > 11 and stateInd <= 15:
 		return "Left Wink"
-	elif stateInd > 23 and stateInd <= 29:
+	elif stateInd > 15 and stateInd <= 19:
 		return "Right Wink"
-	elif stateInd > 29 and stateInd <= 35:
+	elif stateInd > 19 and stateInd <= 23:
 		return "Left Brow"
-	elif stateInd > 35 and stateInd <= 37:
+	elif stateInd > 23 and stateInd <= 25:
 		return "No Trigger"
-	elif stateInd > 37 and stateInd <= 39:
+	elif stateInd > 25 and stateInd <= 27:
 		return "Talking"
 		
 def getRadius(stateInd):
-	if stateInd <= 1 or stateInd == 40:
+	if stateInd <= 1 or stateInd == defaultState:
 		return mainRadius 
 	if stateInd <= 3 and stateInd > 1:
 		return mainRadius - 20
