@@ -209,7 +209,7 @@ def controlStateGetCount(stateInd,currentCount):
 		
 def getTargetTime(stateInd):
 	if stateCounts[stateInd] == -1:
-		return time.time() + 3, True
+		return time.time() + 5, True
 	elif stateCounts[stateInd] == -2:
 		return time.time() + 2, True
 	else:
